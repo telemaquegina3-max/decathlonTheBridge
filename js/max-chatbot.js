@@ -403,6 +403,12 @@ class MaxChatbot {
     return `Tu es Max, le conseiller running officiel et chaleureux de Decathlon et The Bridge.
 Ton rôle est d'accompagner chaque coureur dans sa pratique sportive, du parfait débutant au marathonien chevronné.
 
+Adapte tes conseils aux besoins suivants, sans demander au visiteur de choisir un persona :
+- Sophie reprend la course sur route 1 à 2 fois par semaine, avec 60 à 90 €. Explique le confort en termes simples, propose un modèle dans le budget et indique comment choisir la pointure.
+- Thomas prépare un 10 km sur route. Compare deux modèles du catalogue, avec un critère clair pour choisir entre entraînement régulier et séances rapides.
+- Inès débute et cherche une première paire abordable. Demande son plafond s’il manque, puis recommande une seule paire adaptée et inclus sa carte produit.
+- Respecte le plafond donné. Si aucun modèle adapté ne rentre dans le budget, dis-le clairement.
+
 Ton style & ta personnalité :
 - Tu es bienveillant, dynamique, passionné et ultra-compétent sur les aspects techniques du running (foulée, amorti, drop, biomécanique, VMA, fractionné, hydratation, ampoules, récupération).
 - Tu adoptes un vrai style CONVERSATIONNEL, naturel et humain. Ne pose JAMAIS de questionnaire rigide ou de formulaire à choix multiples. Échange comme un vrai conseiller en magasin Decathlon qui prend le temps d'écouter son client.
@@ -587,6 +593,38 @@ Règles de balisage interactif indispensables :
 
   handleOfflineResponse(rawText) {
     const q = rawText.toLowerCase();
+
+    // Scénarios des personas du projet 4, en mode démo.
+    const budget = Number(q.match(/(\d+(?:[.,]\d+)?)\s*(?:€|euros?)/)?.[1]?.replace(',', '.') ?? Infinity);
+    const reprise = /repren|reprise/.test(q);
+    const debut = /début|commenc|première paire/.test(q);
+    const dixKm = /\b10\s*km\b/.test(q);
+    if (dixKm || reprise || debut) {
+      const options = dixKm ? [14, 15] : reprise ? [14, 3, 13] : [13];
+      const eligible = options.filter(id => PRODUCTS.some(p => p.id === id && p.price <= budget));
+      const selected = dixKm ? eligible : eligible.slice(0, 1);
+      if (debut && !reprise && !dixKm && budget === Infinity) {
+        this.pushBotMessage('Quel est votre budget maximum pour votre première paire ?');
+        this.setChips(['Je débute avec 40 €', 'Je débute avec 60 €']);
+        return;
+      }
+      if (!selected.length) {
+        this.pushBotMessage('Je ne trouve pas de modèle adapté à votre objectif dans ce budget. Quel critère souhaitez-vous privilégier ?');
+        this.setChips([]);
+        return;
+      }
+      const advice = {
+        3: 'La Jogflow 500.1 est une option souple pour reprendre tranquillement.',
+        13: 'La Jogflow 190.1 est le modèle le plus abordable pour des sorties occasionnelles.',
+        14: 'La Kipcore est polyvalente sur route pour vos entraînements réguliers.',
+        15: 'La Kipstorm Interval est destinée aux séances rapides et au fractionné.'
+      };
+      const sizing = reprise && !dixKm ? '\n\nPour la pointure, mesurez vos deux pieds et référez-vous au guide des tailles de la fiche.' : '';
+      this.pushBotMessage(selected.map(id => advice[id]).join('\n\n') + sizing, selected);
+      this.setChips([]);
+      return;
+    }
+
 
     // 1. Choix de chaussures / Recommandations générales
     if (q.includes('bien choisir') || q.includes('choisir') || (q.includes('chaussure') && (q.includes('quelle') || q.includes('conseil') || q.includes('aide')))) {
